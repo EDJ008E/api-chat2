@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chatbot</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #f0f0f0;
+            margin: 0;
+        }
+
+        .chat-container {
+            width: 400px;
+            background: #fff;
+            border-radius: 10px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+            padding: 20px;
+        }
+
+        h1 {
+            text-align: center;
+            color: #333;
+        }
+
+        #chat-box {
+            max-height: 300px;
+            overflow-y: auto;
+            margin-bottom: 15px;
+            padding: 10px;
+            background-color: #fafafa;
+            border-radius: 5px;
+            border: 1px solid #ddd;
+        }
+
+        #messages {
+            margin: 0;
+        }
+
+        #user-input {
+            width: calc(100% - 60px);
+            padding: 10px;
+            margin-right: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+
+        button, #mic-btn {
+            padding: 10px 15px;
+            background-color: #4CAF50;
+            color: #fff;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        button:hover, #mic-btn:hover {
+            background-color: #45a049;
+        }
+
+        #mic-btn {
+            background-color: #ff5722;
+        }
+
+        #mic-btn:hover {
+            background-color: #e64a19;
+        }
+
+        .message {
+            margin: 10px 0;
+        }
+
+        .user-message {
+            text-align: right;
+        }
+
+        .bot-message {
+            text-align: left;
+        }
+    </style>
+</head>
+<body>
+    <div class="chat-container">
+        <h1>Chatbot Interface</h1>
+        <div id="chat-box">
+            <div id="messages"></div>
+        </div>
+        <input type="text" id="user-input" placeholder="Type your message" aria-label="Message input" />
+        <button onclick="sendMessage()">Send</button>
+        <button id="mic-btn" onclick="startDictation()" aria-label="Start voice recognition">🎤</button>
+    </div>
+
+    <script>
+        let recognition;
+        let isBotResponding = false;  // Flag to track if bot is responding
+    
+        // Initialize speech recognition
+        function initializeSpeechRecognition() {
+            try {
+                recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+                recognition.lang = "ta-IN";
+                recognition.onresult = function(event) {
+                    const userMessage = event.results[0][0].transcript;
+                    document.getElementById('user-input').value = userMessage;
+                    sendMessage();  // Send the message once speech recognition is complete
+                };
+                recognition.onerror = function(event) {
+                    console.error("Speech recognition error:", event);
+                };
+                recognition.onend = function() {
+                    if (!isBotResponding) {
+                        recognition.start();  // Restart recognition only if bot is not responding
+                    }
+                };
+            } catch (err) {
+                console.error("Speech recognition is not supported in this browser.", err);
+            }
+        }
+    
+        // Start speech recognition for dictation
+        function startDictation() {
+            if (recognition && !isBotResponding) {
+                recognition.start();  // Only start recognition if bot isn't responding
+            } else {
+                console.error("Speech recognition is not initialized or bot is responding.");
+            }
+        }
+    
+        // Send message to server and display bot response
+        function sendMessage() {
+            const userMessage = document.getElementById('user-input').value.trim();
+            if (!userMessage) return;
+    
+            const messagesDiv = document.getElementById('messages');
+            messagesDiv.innerHTML += `<p class='message user-message'><strong>You:</strong> ${userMessage}</p>`;
+    
+            // Disable speech recognition while the bot is responding
+            isBotResponding = true;
+            
+            fetch('/chat', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ message: userMessage })
+            })
+            .then(response => response.json())
+            .then(data => {
+                const botMessage = data.reply;
+                const audioUrl = data.audio_url;  // Corrected the audio URL reference
+                messagesDiv.innerHTML += `<p class='message bot-message'><strong>Bot:</strong> ${botMessage}</p>`;
+                document.getElementById('user-input').value = '';
+                
+                // Play the audio
+                const audio = new Audio(audioUrl);
+                audio.play();
+    
+                // Once the audio is finished, enable speech recognition
+                audio.onended = function() {
+                    isBotResponding = false;  // Set flag to false after the audio ends
+                    recognition.start();  // Restart the speech recognition
+                };
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                isBotResponding = false;  // In case of error, ensure bot is not considered responding
+            });
+        }
+    
+        window.onload = function() {
+            initializeSpeechRecognition();
+        };
+    </script>
+    
+</body>
+</html>

@@ -1,0 +1,8 @@
+google-generativeai
+nltk
+tamil
+Flask
+requests
+scikit-learn
+gtts
+
